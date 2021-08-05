@@ -23,6 +23,7 @@ var ilib = require("ilib");
 var Locale = require("ilib/lib/Locale.js");
 var ResBundle = require("ilib/lib/ResBundle.js");
 var log4js = require("log4js");
+var mm = require("micromatch");
 
 var YamlFile = require("./YamlFile.js");
 
@@ -64,6 +65,52 @@ var YamlFileType = function(project) {
     }
 };
 
+/**
+ * Default mapping if none was provided in the yaml config.
+ *
+ * @type Object
+ **/
+var defaultMappings = {
+    "**/*.y?(a)ml": {
+        template: "resources/[locale]/[filename]"
+    }
+};
+
+YamlFileType.prototype.getMapping = function (pathName) {
+    if (typeof(pathName) === "undefined") {
+        return undefined;
+    }
+
+    var yamlSettings = this.project.settings.yaml;
+
+    var mappings = (yamlSettings && yamlSettings.mappings) ? yamlSettings.mappings : defaultMappings;
+    var patterns = Object.keys(mappings);
+
+    var match = patterns.find(function(pattern) {
+        return mm.isMatch(pathName, pattern);
+    });
+
+    return match && mappings[match];
+};
+
+/**
+ * Returns default mapping value.
+ *
+ * @returns {Object}
+ */
+YamlFileType.prototype.getDefaultMapping = function() {
+    return defaultMappings["**/*.y?(a)ml"];
+}
+
+/**
+ * Default schema = empty schema.
+ *
+ * @returns {{}}
+ */
+YamlFileType.prototype.getDefaultSchema = function () {
+    return {};
+}
+
 var alreadyLoc = new RegExp(/(^|\/)(([a-z][a-z])(-[A-Z][a-z][a-z][a-z])?(-[A-Z][A-Z](-[A-Z]+)?)?)\.yml$/);
 
 /**
@@ -76,26 +123,28 @@ var alreadyLoc = new RegExp(/(^|\/)(([a-z][a-z])(-[A-Z][a-z][a-z][a-z])?(-[A-Z][
 YamlFileType.prototype.handles = function(pathName) {
     logger.debug("YamlFileType handles " + pathName + "?");
 
-    var ret = pathName.length > 4 && pathName.substring(pathName.length - 4) === ".yml";
+    var mapping = this.getMapping(pathName);
 
-    if (ret) ret = !this.project.isResourcePath("yml", pathName);
+    // No matching mapping exist => not localizable.
+    if (!mapping) {
+        return false;
+    }
 
-    if (ret) {
-        var match = alreadyLoc.exec(pathName);
-        if (match !== null) {
-            var spec = "";
-            if (match[2]) {
-                // filter out the variant if there is one
-                locale = new Locale(match[2]);
-                locale = new Locale(locale.language, locale.region, undefined, locale.script);
-                spec = locale.getSpec();
-            }
-            ret = !this.API.utils.iso639[match[3]] && spec !== this.project.sourceLocale;
+    // Check if this file is an already localized file.
+    var yamlSettings = this.project.settings.yaml;
+    var mappings = (yamlSettings && yamlSettings.mappings) ? yamlSettings.mappings : defaultMappings;
+    var patterns = Object.keys(mappings);
+
+    // Check all mappings and see if filename matches mapping's template.
+    for (var i = 0; i < patterns.length; i++) {
+        var locale = this.API.utils.getLocaleFromPath(mappings[patterns[i]].template, pathName);
+
+        if (locale && locale !== this.project.sourceLocale) {
+            return false;
         }
     }
 
-    logger.debug(ret ? "Yes" : "No");
-    return ret;
+    return true;
 };
 
 /**

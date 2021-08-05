@@ -26,14 +26,27 @@ var path = require("path");
 
 var p = new CustomProject({
     sourceLocale: "en-US",
-    resourceDirs: {
-        "yml": "config/locales"
-    },
     plugins: [
         path.join(process.cwd(), "YamlFileType")
     ]
 }, "./test/testfiles", {
-    locales:["en-GB"]
+    locales:["en-GB"],
+    yaml: {
+        mappings: {
+            "foo.yml": {
+                template: "resources/[locale]/foo.yml"
+            },
+            "**/strings.yaml": {
+                template: "[dir]/strings.[locale].yaml"
+            },
+            "**/test/strings.y?(a)ml": {
+                template: "[dir]/[basename]/[locale].[extension]"
+            },
+            "**/*.y?(a)ml": {
+                template: "resources/[locale]/[filename]"
+            }
+        }
+    }
 });
 
 var p2 = new CustomProject({
@@ -68,6 +81,17 @@ module.exports.yamlfiletype = {
         test.done();
     },
 
+    testYamlFileTypeHandlesYaml: function(test) {
+        test.expect(2);
+
+        var yft = new YamlFileType(p);
+        test.ok(yft);
+
+        test.ok(yft.handles("foo.yaml"));
+
+        test.done();
+    },
+
     testYamlFileTypeHandlesAnythingFalse: function(test) {
         test.expect(4);
 
@@ -87,110 +111,65 @@ module.exports.yamlfiletype = {
         var yft = new YamlFileType(p);
         test.ok(yft);
 
-        test.ok(!yft.handles("config/locales/en-US.yml"));
+        test.ok(!yft.handles("resources/ru-RU/foo.yml"));
 
         test.done();
     },
 
-    testYamlFileTypeHandlesNoFilesNamedForALocale: function(test) {
+    testYamlFileTypeHandlesSourceLocaleFilesInSubfolders: function(test) {
+        test.expect(2);
+
+        var yft = new YamlFileType(p);
+        test.ok(yft);
+
+        test.ok(yft.handles("subfolder/strings.en-US.yaml"));
+
+        test.done();
+    },
+
+    testYamlFileTypeHandlesNoLocalizedFilesInSubfolders: function(test) {
+        test.expect(2);
+
+        var yft = new YamlFileType(p);
+        test.ok(yft);
+
+        test.ok(!yft.handles("subfolder/strings.ru-RU.yaml"));
+
+        test.done();
+    },
+
+    testYamlFileTypeHandlesFilesNamedForALocale: function(test) {
         test.expect(4);
 
         var yft = new YamlFileType(p);
         test.ok(yft);
 
-        test.ok(!yft.handles("en-US.yml"));
-        test.ok(!yft.handles("de-DE.yml"));
-        test.ok(!yft.handles("en.yml"));
+        test.ok(yft.handles("en-US.yml"));
+        test.ok(yft.handles("de-DE.yml"));
+        test.ok(yft.handles("en.yml"));
 
         test.done();
     },
 
-    testYamlFileTypeHandlesNoFilesNamedForALocaleWithFlavor: function(test) {
-        test.expect(2);
-
-        var yft = new YamlFileType(p2);
-        test.ok(yft);
-
-        test.ok(!yft.handles("en-ZA-ASDF.yml"));
-
-        test.done();
-    },
-
-    testYamlFileTypeHandlesNoFilesNamedForALocaleInASubdir: function(test) {
-        test.expect(4);
-
-        var yft = new YamlFileType(p);
-        test.ok(yft);
-
-        test.ok(!yft.handles("a/b/en-US.yml"));
-        test.ok(!yft.handles("c/d/de-DE.yml"));
-        test.ok(!yft.handles("e/f/en.yml"));
-
-        test.done();
-    },
-
-    testYamlFileTypeHandlesNoFilesNamedForALocaleWithFlavorInASubdir: function(test) {
-        test.expect(2);
-
-        var yft = new YamlFileType(p2);
-        test.ok(yft);
-
-        test.ok(!yft.handles("a/b/en-ZA-ASDF.yml"));
-
-        test.done();
-    },
-
-    testYamlFileTypeHandlesFilesAlmostNamedForALocale: function(test) {
+    testYamlFileTypeHandlesResourceFilesInSubdirs: function(test) {
         test.expect(2);
 
         var yft = new YamlFileType(p);
         test.ok(yft);
 
-        test.ok(yft.handles("config/states.yml"));
+        test.ok(yft.handles("resources/ru-RU/subdir/foo.yml"));
 
         test.done();
     },
 
-    testYamlFileTypeHandlesNoResourceFilesInSubdirs: function(test) {
-        test.expect(2);
+    testYamlFileTypeHandlesBasenameDirMapping: function(test) {
+        test.expect(3);
 
         var yft = new YamlFileType(p);
         test.ok(yft);
 
-        test.ok(!yft.handles("config/locales/auto/en-US.yml"));
-
-        test.done();
-    },
-
-    testYamlFileTypeHandlesNoResourceFilesInSubdirsWithFlavors: function(test) {
-        test.expect(2);
-
-        var yft = new YamlFileType(p2);
-        test.ok(yft);
-
-        test.ok(!yft.handles("config/locales/auto/en-ZA-ASDF.yml"));
-
-        test.done();
-    },
-
-    testYamlFileTypeHandlesNoBaseResourceFiles: function(test) {
-        test.expect(2);
-
-        var yft = new YamlFileType(p);
-        test.ok(yft);
-
-        test.ok(!yft.handles("config/locales/en.yml"));
-
-        test.done();
-    },
-
-    testYamlFileTypeHandlesIncludeFiles: function(test) {
-        test.expect(2);
-
-        var yft = new YamlFileType(p);
-        test.ok(yft);
-
-        test.ok(yft.handles("config/nofications.yml"));
+        test.ok(yft.handles("test/strings.yaml"));
+        test.ok(!yft.handles("test/strings/ru-RU.yaml"));
 
         test.done();
     }
