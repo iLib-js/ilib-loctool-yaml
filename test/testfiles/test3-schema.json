@@ -1,3 +1,4 @@
 {
-  "excluded_keys": ["do_not_read_me"]
+  "excluded_keys": ["do_not_read_me"],
+  "comment_prefix": "L10N:"
 }
